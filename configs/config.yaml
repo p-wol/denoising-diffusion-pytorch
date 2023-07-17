@@ -1,0 +1,7 @@
+seed: 1
+system:
+    dtype: 64
+    device: 0
+dataset:
+    name: 'noise'    # 'MNIST', 'CIFAR10', etc.
+    path: '.'    # /gpfswork/rech/tza/uki35ex/dataset
