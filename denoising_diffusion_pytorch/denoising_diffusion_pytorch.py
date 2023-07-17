@@ -794,6 +794,9 @@ class GaussianDiffusion(nn.Module):
         return loss.mean()
 
     def forward(self, img, *args, **kwargs):
+        #print(img.shape)
+        #print(img.device)
+        #print(self.image_size)
         b, c, h, w, device, img_size, = *img.shape, img.device, self.image_size
         assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
         t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
@@ -841,8 +844,7 @@ class Trainer(object):
     def __init__(
         self,
         diffusion_model,
-        #folder,
-        data_loader,
+        dataset,
         *,
         train_batch_size = 16,
         gradient_accumulate_every = 1,
@@ -897,12 +899,13 @@ class Trainer(object):
         # dataset and dataloader
 
         #self.ds = Dataset(folder, self.image_size, augment_horizontal_flip = augment_horizontal_flip, convert_image_to = convert_image_to)
-        #self.ds = dataset
+        self.ds = dataset
 
         #assert len(self.ds) >= 100, 'you should have at least 100 images in your folder. at least 10k images recommended'
 
-        #dl = DataLoader(self.ds, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = cpu_count())
-        dl = data_loader
+        num_workers = cpu_count()
+        dl = DataLoader(dataset, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = num_workers)
+        #dl = dataset
 
         dl = self.accelerator.prepare(dl)
         self.dl = cycle(dl)

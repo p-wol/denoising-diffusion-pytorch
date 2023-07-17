@@ -10,7 +10,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils import data
 import mlxpy
-from denoising_diffusion_pytorch import Unet, GaussianDiffusion
+from denoising_diffusion_pytorch import Unet, GaussianDiffusion, Trainer
 from functools import partialmethod
 
 import tqdm
@@ -41,8 +41,18 @@ def get_dtype(dtype):
     else:
         raise ValueError('Unkown dtype: {}'.format(dtype))
 
+class ListDataset(data.Dataset):
+    def __init__(self, lst_tensors):
+        self.lst_tensors = lst_tensors
 
-class Trainer:
+    def __getitem__(self, index):
+        return self.lst_tensors[index]
+
+    def __len__(self):
+        return len(self.lst_tensors)
+
+
+class Training:
     def __init__(self, config, logger):
         self.args = config
         self.logger= logger
@@ -50,46 +60,55 @@ class Trainer:
         self.device = assign_device(self.args.system.device)
         self.dtype = get_dtype(self.args.system.dtype)
 
+    def dataset_extract_images(self, ds):
+        #images = [(torch.tensor(t, device = self.device, dtype = self.dtype).transpose(0, 2).transpose(1, 2) - 127.5)/127.5 for t in ds.data]
+        images = [(torch.tensor(t).transpose(0, 2).transpose(1, 2) - 127.5)/127.5 for t in ds.data]
+        return ListDataset(images)
+
     def build_dataset(self):
         args = self.args
 
         if args.dataset.name == 'noise':
             self.trainset = torch.rand(8, 3, 128, 128, device = self.device) # images are normalized from 0 to 1
             self.testset = None #torch.rand(8, 3, 128, 128) # images are normalized from 0 to 1
+            self.image_size = 128
         elif args.dataset.name == 'MNIST':
             #transform = [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
-            transform = [transforms.ToTensor()]
+            #transform = [transforms.ToTensor()]
             #if not args.model.name == 'LeNet':
             #    transform.append(transforms.Lambda(lambda x: x.view(-1)))
-            transform = transforms.Compose(transform)
+            #transform = transforms.Compose(transform)
 
             tvsize = 60000
 
-            self.trainset = torchvision.datasets.MNIST(root = args.dataset.path, train = True,
-                    download = False, transform = transform)
+            trainset = torchvision.datasets.MNIST(root = args.dataset.path, train = True, download = False)
+            self.trainset = self.dataset_extract_images(trainset)
 
-            self.testset = torchvision.datasets.MNIST(root = args.dataset.path, train = False,
-                    download = False, transform = transform)
+            testset = torchvision.datasets.MNIST(root = args.dataset.path, train = False, download = False)
+            self.testset = self.dataset_extract_images(testset)
 
             self.n_classes = 10
             self.n_channels = 1
+            self.image_size = 28
             self.channel_size = 28**2
         elif args.dataset.name == 'CIFAR10':
             #transform = [transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))]
-            transform = [transforms.ToTensor()]
+            #transform = [transforms.ToTensor()]
             #if not args.model.name == 'LeNet':
             #    transform.append(transforms.Lambda(lambda x: x.view(-1)))
-            transform = transforms.Compose(transform)
+            #transform = transforms.Compose(transform)
 
             tvsize = 50000
 
-            self.trainset = torchvision.datasets.CIFAR10(root = args.dataset.path, train = True,
-                    download = False, transform = transform)
-            self.testset = torchvision.datasets.CIFAR10(root = args.dataset.path, train = False,
-                    download = False, transform = transform)
+            trainset = torchvision.datasets.CIFAR10(root = args.dataset.path, train = True, download = False)
+            self.trainset = self.dataset_extract_images(trainset)
+
+            testset = torchvision.datasets.CIFAR10(root = args.dataset.path, train = False, download = False)
+            self.testset = self.dataset_extract_images(testset)
 
             self.n_classes = 10
             self.n_channels = 3
+            self.image_size = 32
             self.channel_size = 32**2
         else:
             raise NotImplementedError('Unknown dataset: {}.'.format(args.dataset.name))
@@ -112,14 +131,14 @@ class Trainer:
 
 
     def train(self, ckpt_name = 'last_ckpt', log_name = 'metrics'):
+        print('Build dataset.')
+        self.build_dataset()
+
         print('Build model')
         model = Unet(dim = 64, dim_mults = (1, 2, 4, 8), flash_attn = True).to(device = self.device)
 
         print('Build diffusion model.')
-        diffusion = GaussianDiffusion(model, image_size = 128, timesteps = 1000).to(device = self.device)
-
-        print('Build dataset.')
-        self.build_dataset()
+        diffusion = GaussianDiffusion(model, image_size = self.image_size, timesteps = 1000).to(device = self.device)
         
         #training_images = torch.rand(8, 3, 128, 128) # images are normalized from 0 to 1
         trainer = Trainer(

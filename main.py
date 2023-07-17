@@ -7,7 +7,7 @@ import random
 import numpy as np
 import torch
 import mlxpy
-from training import Trainer
+from training import Training
 
 
 def set_seeds(seed):    
@@ -26,7 +26,7 @@ def main(ctx):
         print("Loading from latest checkpoint")
     except:
         print("Failed to load checkpoint, Starting from scratch")
-        trainer = Trainer(ctx.config, ctx.logger)
+        trainer = Training(ctx.config, ctx.logger)
 
     trainer.train()
 

@@ -1,6 +1,6 @@
 seed: 1
 system:
-    dtype: 64
+    dtype: 32
     device: 0
 dataset:
     name: 'noise'    # 'MNIST', 'CIFAR10', etc.
