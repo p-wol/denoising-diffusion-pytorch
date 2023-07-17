@@ -841,7 +841,8 @@ class Trainer(object):
     def __init__(
         self,
         diffusion_model,
-        folder,
+        #folder,
+        data_loader,
         *,
         train_batch_size = 16,
         gradient_accumulate_every = 1,
@@ -895,11 +896,13 @@ class Trainer(object):
 
         # dataset and dataloader
 
-        self.ds = Dataset(folder, self.image_size, augment_horizontal_flip = augment_horizontal_flip, convert_image_to = convert_image_to)
+        #self.ds = Dataset(folder, self.image_size, augment_horizontal_flip = augment_horizontal_flip, convert_image_to = convert_image_to)
+        #self.ds = dataset
 
-        assert len(self.ds) >= 100, 'you should have at least 100 images in your folder. at least 10k images recommended'
+        #assert len(self.ds) >= 100, 'you should have at least 100 images in your folder. at least 10k images recommended'
 
-        dl = DataLoader(self.ds, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = cpu_count())
+        #dl = DataLoader(self.ds, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = cpu_count())
+        dl = data_loader
 
         dl = self.accelerator.prepare(dl)
         self.dl = cycle(dl)
