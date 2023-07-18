@@ -55,7 +55,8 @@ class Attend(nn.Module):
 
         device_properties = torch.cuda.get_device_properties(torch.device('cuda'))
 
-        if device_properties.major == 8 and device_properties.minor == 0:
+        #if device_properties.major == 8 and device_properties.minor == 0:
+        if False:
             print_once('A100 GPU detected, using flash attention if input tensor is on cuda')
             self.cuda_config = AttentionConfig(True, False, False)
         else:

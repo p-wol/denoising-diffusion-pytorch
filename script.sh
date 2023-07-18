@@ -7,10 +7,10 @@ HYDRA_FULL_ERROR=1   OC_CAUSE=1 python main.py  \
 				dataset.type='test'\
 				dataset.name='FlickrFace'\
 				dataset.path='/gpfswork/rech/tza/uki35ex/dataset/'\
-				dataset.batch_size=16\
-				dataset.num_workers=4\
-				dataset.pin_memory=False\
-				dataset.max_size=10000\
+				dataset.batch_size=8\
+				dataset.num_workers=2\
+				dataset.pin_memory=True\
+				dataset.max_size=50000\
 				optimizer.lr=.00008\
 				optimizer.num_steps=500000\
 				optimizer.grad_acc=2\

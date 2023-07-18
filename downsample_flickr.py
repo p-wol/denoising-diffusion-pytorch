@@ -40,5 +40,5 @@ class Dataset(data.Dataset):
 path_out = '/gpfswork/rech/tza/uki35ex/dataset/fickr_faces'
 ds = Dataset('/gpfsdswork/dataset/FlickrFace/images1024x1024', image_size = 256)
 
-for i in range(29653, 70000):
+for i in range(70000):
     ds[i].save(path_out + '/{:05}.png'.format(i))
