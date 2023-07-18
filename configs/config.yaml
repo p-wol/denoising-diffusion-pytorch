@@ -3,5 +3,19 @@ system:
     dtype: 32
     device: 0
 dataset:
+    type: 'test'    # train or test
     name: 'noise'    # 'MNIST', 'CIFAR10', etc.
     path: '.'    # /gpfswork/rech/tza/uki35ex/dataset
+    batch_size: 32
+    num_workers: -1
+optimizer:
+    lr: .00008
+    num_steps: 700000
+    grad_acc: 2     # gradient accumulation steps
+checkpoints:
+    mode: 'train'    # 'train', 'load'
+    save_path: '/gpfsscratch/rech/tza/uki35ex/_Experiments/denoising_diffusion_pytorch/models/test'
+    load_path: '/gpfsscratch/rech/tza/uki35ex/_Experiments/denoising_diffusion_pytorch/models/test'
+sampling:
+    calculate_fid: True
+    num_fid_samples: 50000

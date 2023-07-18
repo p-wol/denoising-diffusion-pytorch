@@ -865,7 +865,8 @@ class Trainer(object):
         inception_block_idx = 2048,
         max_grad_norm = 1.,
         num_fid_samples = 50000,
-        save_best_and_latest_only = False
+        save_best_and_latest_only = False,
+        num_workers = -1
     ):
         super().__init__()
 
@@ -903,7 +904,8 @@ class Trainer(object):
 
         #assert len(self.ds) >= 100, 'you should have at least 100 images in your folder. at least 10k images recommended'
 
-        num_workers = cpu_count()
+        if num_workers == -1:
+            num_workers = cpu_count()
         dl = DataLoader(dataset, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = num_workers)
         #dl = dataset
 
@@ -1003,9 +1005,7 @@ class Trainer(object):
         device = accelerator.device
 
         with tqdm(initial = self.step, total = self.train_num_steps, disable = not accelerator.is_main_process) as pbar:
-
             while self.step < self.train_num_steps:
-
                 total_loss = 0.
 
                 for _ in range(self.gradient_accumulate_every):
@@ -1033,6 +1033,8 @@ class Trainer(object):
                     self.ema.update()
 
                     if self.step != 0 and divisible_by(self.step, self.save_and_sample_every):
+                        print('Evaluation {}/{}:'.format(self.step // self.save_and_sample_every, self.train_num_steps // self.save_and_sample_every))
+                        print('    last total_loss = {:.4f}'.format(total_loss))
                         self.ema.ema_model.eval()
 
                         with torch.inference_mode():
@@ -1047,8 +1049,10 @@ class Trainer(object):
                         # whether to calculate fid
 
                         if self.calculate_fid:
+                            print('        (computing FID score...)')
                             fid_score = self.fid_scorer.fid_score()
                             accelerator.print(f'fid_score: {fid_score}')
+                            print(f'    fid_score: {fid_score}')
                         if self.save_best_and_latest_only:
                             if self.best_fid > fid_score:
                                 self.best_fid = fid_score

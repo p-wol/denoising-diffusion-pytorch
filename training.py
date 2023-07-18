@@ -131,8 +131,16 @@ class Training:
 
 
     def train(self, ckpt_name = 'last_ckpt', log_name = 'metrics'):
+        self.args.checkpoints.save_path = self.args.checkpoints.save_path + '/{}'.format(self.logger.forced_log_id)
+
         print('Build dataset.')
         self.build_dataset()
+        if self.args.dataset.type == 'test':
+            dataset = self.testset
+        elif self.args.dataset.type == 'train':
+            dataset = self.trainset
+        else:
+            raise ValueError('Unknown dataset type: {}'.format(self.args.dataset.type))
 
         print('Build model')
         model = Unet(dim = 64, dim_mults = (1, 2, 4, 8), flash_attn = True).to(device = self.device)
@@ -143,14 +151,17 @@ class Training:
         #training_images = torch.rand(8, 3, 128, 128) # images are normalized from 0 to 1
         trainer = Trainer(
             diffusion,
-            self.trainset,
-            train_batch_size = 32,
-            train_lr = 8e-5,
-            train_num_steps = 700000,         # total training steps
-            gradient_accumulate_every = 2,    # gradient accumulation steps
-            ema_decay = 0.995,                # exponential moving average decay
-            amp = True,                       # turn on mixed precision
-            calculate_fid = True              # whether to calculate fid during training
+            dataset,
+            train_batch_size = self.args.dataset.batch_size,
+            train_lr = self.args.optimizer.lr,
+            train_num_steps = self.args.optimizer.num_steps,             # total training steps
+            gradient_accumulate_every = self.args.optimizer.grad_acc,    # gradient accumulation steps
+            ema_decay = 0.995,                                           # exponential moving average decay
+            results_folder = self.args.checkpoints.save_path,
+            amp = True,                                                  # turn on mixed precision
+            calculate_fid = self.args.sampling.calculate_fid,            # whether to calculate fid during training
+            num_fid_samples = self.args.sampling.num_fid_samples,
+            num_workers = self.args.dataset.num_workers
         )
 
         trainer.train()
