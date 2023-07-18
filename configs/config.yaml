@@ -8,6 +8,8 @@ dataset:
     path: '.'    # /gpfswork/rech/tza/uki35ex/dataset
     batch_size: 32
     num_workers: -1
+    pin_memory: True
+    max_size: -1
 optimizer:
     lr: .00008
     num_steps: 700000

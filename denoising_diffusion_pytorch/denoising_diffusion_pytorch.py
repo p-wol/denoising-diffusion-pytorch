@@ -480,6 +480,8 @@ class GaussianDiffusion(nn.Module):
         self.channels = self.model.channels
         self.self_condition = self.model.self_condition
 
+        if type(image_size) != tuple:
+            image_size = (image_size, image_size)
         self.image_size = image_size
 
         self.objective = objective
@@ -715,7 +717,7 @@ class GaussianDiffusion(nn.Module):
     def sample(self, batch_size = 16, return_all_timesteps = False):
         image_size, channels = self.image_size, self.channels
         sample_fn = self.p_sample_loop if not self.is_ddim_sampling else self.ddim_sample
-        return sample_fn((batch_size, channels, image_size, image_size), return_all_timesteps = return_all_timesteps)
+        return sample_fn((batch_size, channels, *image_size), return_all_timesteps = return_all_timesteps)
 
     @torch.inference_mode()
     def interpolate(self, x1, x2, t = None, lam = 0.5):
@@ -798,7 +800,7 @@ class GaussianDiffusion(nn.Module):
         #print(img.device)
         #print(self.image_size)
         b, c, h, w, device, img_size, = *img.shape, img.device, self.image_size
-        assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
+        assert h == img_size[0] and w == img_size[1], f'height and width of image must be {img_size}'
         t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
 
         img = self.normalize(img)
@@ -866,7 +868,8 @@ class Trainer(object):
         max_grad_norm = 1.,
         num_fid_samples = 50000,
         save_best_and_latest_only = False,
-        num_workers = -1
+        num_workers = -1,
+        pin_memory = True
     ):
         super().__init__()
 
@@ -906,7 +909,7 @@ class Trainer(object):
 
         if num_workers == -1:
             num_workers = cpu_count()
-        dl = DataLoader(dataset, batch_size = train_batch_size, shuffle = True, pin_memory = True, num_workers = num_workers)
+        dl = DataLoader(dataset, batch_size = train_batch_size, shuffle = True, pin_memory = pin_memory, num_workers = num_workers)
         #dl = dataset
 
         dl = self.accelerator.prepare(dl)

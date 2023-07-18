@@ -12,6 +12,8 @@ from torch.utils import data
 import mlxpy
 from denoising_diffusion_pytorch import Unet, GaussianDiffusion, Trainer
 from functools import partialmethod
+from pathlib import Path
+from PIL import Image
 
 import tqdm
 tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
@@ -41,6 +43,28 @@ def get_dtype(dtype):
     else:
         raise ValueError('Unkown dtype: {}'.format(dtype))
 
+class NewCelebA(torchvision.datasets.CelebA):
+    def __init__(self, *args, **kwargs):
+        super(NewCelebA, self).__init__(*args, **kwargs)
+
+    def _check_integrity(self):
+        return True
+
+class ImageDataset(data.Dataset):
+    def __init__(self, root = '.', exts = ['jpg', 'jpeg', 'png', 'tiff']):
+        super().__init__()
+        self.root = root
+        self.paths = [p for ext in exts for p in Path(f'{root}').glob(f'**/*.{ext}')]
+        self.transform = transforms.ToTensor()
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, index):
+        path = self.paths[index]
+        img = Image.open(path)
+        return self.transform(img)
+
 class ListDataset(data.Dataset):
     def __init__(self, lst_tensors):
         self.lst_tensors = lst_tensors
@@ -51,6 +75,15 @@ class ListDataset(data.Dataset):
     def __len__(self):
         return len(self.lst_tensors)
 
+class WrappedDataset(data.Dataset):
+    def __init__(self, ds):
+        self.ds = ds
+
+    def __getitem__(self, index):
+        return self.ds[index][0]
+
+    def __len__(self):
+        return len(self.ds)
 
 class Training:
     def __init__(self, config, logger):
@@ -110,6 +143,28 @@ class Training:
             self.n_channels = 3
             self.image_size = 32
             self.channel_size = 32**2
+        elif args.dataset.name == 'CelebA':
+            transform = transforms.ToTensor()
+
+            #trainset = torchvision.datasets.CelebA(root = args.dataset.path, split = self.args.dataset.type, 
+            trainset = NewCelebA(root = args.dataset.path, split = self.args.dataset.type, 
+                    download = False, transform = transform)
+            self.trainset = WrappedDataset(trainset)
+
+            #testset = torchvision.datasets.CelebA(root = args.dataset.path, split = self.args.dataset.type, 
+            testset = NewCelebA(root = args.dataset.path, split = self.args.dataset.type, 
+                    download = False, transform = transform)
+            self.testset = WrappedDataset(testset)
+
+            self.image_size = (218, 178)
+        elif args.dataset.name == 'FlickrFace':
+            ds = ImageDataset(args.dataset.path + 'FlickrFace')
+            if self.args.dataset.max_size != -1:
+                ds = data.Subset(ds, list(range(self.args.dataset.max_size)))
+            self.trainset = ds
+            self.testset = ds
+
+            self.image_size = (256, 256)
         else:
             raise NotImplementedError('Unknown dataset: {}.'.format(args.dataset.name))
 
@@ -161,7 +216,8 @@ class Training:
             amp = True,                                                  # turn on mixed precision
             calculate_fid = self.args.sampling.calculate_fid,            # whether to calculate fid during training
             num_fid_samples = self.args.sampling.num_fid_samples,
-            num_workers = self.args.dataset.num_workers
+            num_workers = self.args.dataset.num_workers,
+            pin_memory = self.args.dataset.pin_memory
         )
 
         trainer.train()
