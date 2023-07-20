@@ -201,7 +201,9 @@ class Training:
         model = Unet(dim = 64, dim_mults = (1, 2, 4, 8), flash_attn = True).to(device = self.device)
 
         print('Build diffusion model.')
-        diffusion = GaussianDiffusion(model, image_size = self.image_size, timesteps = 1000).to(device = self.device)
+        objective = self.args.sampling.objective
+        diffusion = GaussianDiffusion(model, image_size = self.image_size, timesteps = 1000,
+                objective = objective).to(device = self.device)
         
         #training_images = torch.rand(8, 3, 128, 128) # images are normalized from 0 to 1
         trainer = Trainer(
@@ -220,7 +222,16 @@ class Training:
             pin_memory = self.args.dataset.pin_memory
         )
 
-        trainer.train()
+        if self.args.checkpoints.mode == 'train':
+            trainer.train()
+        elif self.args.checkpoints.mode == 'test':
+            trainer.load(path = self.args.checkpoints.load_path)
+
+            img = Image.open(self.args.checkpoints.image_test)
+            img = transforms.functional.to_tensor(img).to(device = self.device)
+            img.mul_(2).add_(-1)
+            img = img.unsqueeze(0).expand(1000, *img.size())
+            trainer.reconstruct(img, 20, 50, 50, 100)
         
         """
         print('Compute loss.')

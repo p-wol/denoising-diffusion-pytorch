@@ -172,7 +172,6 @@ class ResnetBlock(nn.Module):
         self.res_conv = nn.Conv2d(dim, dim_out, 1) if dim != dim_out else nn.Identity()
 
     def forward(self, x, time_emb = None):
-
         scale_shift = None
         if exists(self.mlp) and exists(time_emb):
             time_emb = self.mlp(time_emb)
@@ -180,18 +179,12 @@ class ResnetBlock(nn.Module):
             scale_shift = time_emb.chunk(2, dim = 1)
 
         h = self.block1(x, scale_shift = scale_shift)
-
         h = self.block2(h)
 
         return h + self.res_conv(x)
 
 class LinearAttention(nn.Module):
-    def __init__(
-        self,
-        dim,
-        heads = 4,
-        dim_head = 32
-    ):
+    def __init__(self, dim, heads = 4, dim_head = 32):
         super().__init__()
         self.scale = dim_head ** -0.5
         self.heads = heads
@@ -200,10 +193,7 @@ class LinearAttention(nn.Module):
         self.norm = RMSNorm(dim)
         self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias = False)
 
-        self.to_out = nn.Sequential(
-            nn.Conv2d(hidden_dim, dim, 1),
-            RMSNorm(dim)
-        )
+        self.to_out = nn.Sequential(nn.Conv2d(hidden_dim, dim, 1), RMSNorm(dim))
 
     def forward(self, x):
         b, c, h, w = x.shape
@@ -225,13 +215,7 @@ class LinearAttention(nn.Module):
         return self.to_out(out)
 
 class Attention(nn.Module):
-    def __init__(
-        self,
-        dim,
-        heads = 4,
-        dim_head = 32,
-        flash = False
-    ):
+    def __init__(self, dim, heads = 4, dim_head = 32, flash = False):
         super().__init__()
         self.heads = heads
         hidden_dim = dim_head * heads
@@ -983,11 +967,14 @@ class Trainer(object):
 
         torch.save(data, str(self.results_folder / f'model-{milestone}.pt'))
 
-    def load(self, milestone):
+    def load(self, milestone = None, path = None):
         accelerator = self.accelerator
         device = accelerator.device
 
-        data = torch.load(str(self.results_folder / f'model-{milestone}.pt'), map_location=device)
+        if milestone is not None:
+            data = torch.load(str(self.results_folder / f'model-{milestone}.pt'), map_location=device)
+        else:
+            data = torch.load(path, map_location=device)
 
         model = self.accelerator.unwrap_model(self.model)
         model.load_state_dict(data['model'])
@@ -1067,3 +1054,39 @@ class Trainer(object):
                 pbar.update(1)
 
         accelerator.print('training complete')
+
+    def reconstruct(self, img, x1, y1, x2, y2): 
+        # area = ((10, 10), (20, 20)) for a 10-px square: h, w
+        def keep_patch(src, dst):
+            if dst.dim() == 3:
+                """
+                block = src[:, y1:y2][:, :, x1:x2]
+                block_2 = dst[:, y1:y2, :]
+                block_2[:, :, x1:x2] = block
+                dst[:, y1:y2, :] = block_2
+                """
+                dst[:, y1:y2, x1:x2] = src[:, y1:y2, x1:x2]
+                return dst
+            elif dst.dim() == 4:
+                """
+                print(src)
+                print(dst)
+                block = src[:, :, y1:y2][:, :, :, x1:x2]
+                block_2 = dst[:, :, y1:y2, :]
+                block_2[:, :, :, x1:x2] = block
+                dst[:, :, y1:y2, :] = block_2
+                """
+                dst[:, :, y1:y2, x1:x2] = src[:, :, y1:y2, x1:x2]
+                return dst
+            else:
+                raise NotImplementedError('')
+
+        all_t = torch.arange(1000, device = img.device)
+        lst_samples = self.model.q_sample(img, all_t)
+
+        x = lst_samples[999:1000]
+        for i in reversed(range(1, 1000)):
+            y_est = self.model.model_predictions(x, all_t[i:i+1], clip_x_start = True)[1]
+            x = keep_patch(y_est, lst_samples[i-1:i])
+
+        utils.save_image(x, str(self.results_folder / f'reconstructed.png'), nrow = 1)

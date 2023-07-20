@@ -18,6 +18,8 @@ checkpoints:
     mode: 'train'    # 'train', 'load'
     save_path: '/gpfsscratch/rech/tza/uki35ex/_Experiments/denoising_diffusion_pytorch/models/test'
     load_path: '/gpfsscratch/rech/tza/uki35ex/_Experiments/denoising_diffusion_pytorch/models/test'
+    image_test: ''
 sampling:
     calculate_fid: True
     num_fid_samples: 50000
+    objective: 'pred_v'
